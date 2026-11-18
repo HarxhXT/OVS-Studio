@@ -199,7 +199,7 @@ fun PreviewPanel(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun WorkspaceButton(label: String) {
+fun RowScope.WorkspaceButton(label: String) {
     Surface(
         modifier = Modifier
             .weight(1f)
