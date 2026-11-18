@@ -1,0 +1,10 @@
+
+<resources>
+    <style name="Theme.OVSStudio" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#80CBC4</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#101318</item>
+        <item name="android:statusBarColor">#101318</item>
+    </style>
+</resources>
