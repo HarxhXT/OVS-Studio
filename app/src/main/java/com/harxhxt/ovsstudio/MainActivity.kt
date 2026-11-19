@@ -1,6 +1,7 @@
 package com.harxhxt.ovsstudio
 
 import android.os.Bundle
+import android.content.SharedPreferences
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -55,12 +56,14 @@ class Dock(
     x: Float,
     y: Float,
     width: Float,
-    height: Float
+    height: Float,
+    visible: Boolean = true
 ) {
     var x by mutableFloatStateOf(x)
     var y by mutableFloatStateOf(y)
     var width by mutableFloatStateOf(width)
     var height by mutableFloatStateOf(height)
+    var visible by mutableStateOf(visible)
 }
 
 fun defaultDocks(): MutableList<Dock> {
@@ -74,13 +77,9 @@ fun defaultDocks(): MutableList<Dock> {
 }
 
 fun loadDocks(
-    preferences: android.content.SharedPreferences
+    preferences: SharedPreferences
 ): MutableList<Dock> {
     val defaults = defaultDocks()
-
-    if (preferences.getInt("layout_version", 0) != LAYOUT_VERSION) {
-        return defaults
-    }
 
     return defaults.map { dock ->
         val key = dock.type
@@ -91,7 +90,8 @@ fun loadDocks(
             preferences.getFloat("${key}_x", dock.x),
             preferences.getFloat("${key}_y", dock.y),
             preferences.getFloat("${key}_width", dock.width),
-            preferences.getFloat("${key}_height", dock.height)
+            preferences.getFloat("${key}_height", dock.height),
+            preferences.getBoolean("${key}_visible", true)
         )
     }.toMutableList()
 }
@@ -110,11 +110,15 @@ fun OvsWorkspace() {
         }
     }
 
-    val layoutSignature = docks.joinToString("|") {
-        "${it.type}:${it.x}:${it.y}:${it.width}:${it.height}"
+    var docksMenuExpanded by remember {
+        mutableStateOf(false)
     }
 
-    // Automatic workspace saving
+    val layoutSignature = docks.joinToString("|") {
+        "${it.type}:${it.x}:${it.y}:${it.width}:${it.height}:${it.visible}"
+    }
+
+    // Automatically save workspace changes
     LaunchedEffect(layoutSignature) {
         delay(300)
 
@@ -128,9 +132,23 @@ fun OvsWorkspace() {
                 putFloat("${key}_y", dock.y)
                 putFloat("${key}_width", dock.width)
                 putFloat("${key}_height", dock.height)
+                putBoolean("${key}_visible", dock.visible)
             }
 
             apply()
+        }
+    }
+
+    // Restore default workspace
+    fun resetWorkspace() {
+        val defaults = defaultDocks()
+
+        docks.zip(defaults).forEach { (current, default) ->
+            current.x = default.x
+            current.y = default.y
+            current.width = default.width
+            current.height = default.height
+            current.visible = true
         }
     }
 
@@ -143,31 +161,76 @@ fun OvsWorkspace() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(38.dp),
+                .height(42.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 "OVS STUDIO",
                 color = Accent,
-                fontSize = 18.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(8.dp))
 
-            Text(
-                "File   Edit   View   Docks   Help",
-                color = Muted,
-                fontSize = 11.sp
-            )
+            Box {
+                TextButton(
+                    onClick = {
+                        docksMenuExpanded = true
+                    }
+                ) {
+                    Text(
+                        "DOCKS ▾",
+                        color = Color.White,
+                        fontSize = 10.sp
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = docksMenuExpanded,
+                    onDismissRequest = {
+                        docksMenuExpanded = false
+                    }
+                ) {
+                    docks.forEach { dock ->
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment =
+                                        Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = dock.visible,
+                                        onCheckedChange = null
+                                    )
+
+                                    Text(
+                                        dock.title,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            },
+                            onClick = {
+                                dock.visible = !dock.visible
+                            }
+                        )
+                    }
+                }
+            }
 
             Spacer(Modifier.weight(1f))
 
-            Text(
-                "WORKSPACE",
-                color = Muted,
-                fontSize = 10.sp
-            )
+            TextButton(
+                onClick = {
+                    resetWorkspace()
+                }
+            ) {
+                Text(
+                    "RESET LAYOUT",
+                    color = Accent,
+                    fontSize = 9.sp
+                )
+            }
         }
 
         HorizontalDivider(color = Color(0xFF303640))
@@ -183,128 +246,149 @@ fun OvsWorkspace() {
 
             docks.forEachIndexed { index, dock ->
 
-                val panelWidth =
-                    (workspaceWidth * dock.width).coerceAtLeast(70.dp)
+                if (dock.visible) {
 
-                val panelHeight =
-                    (workspaceHeight * dock.height).coerceAtLeast(70.dp)
+                    val panelWidth =
+                        (workspaceWidth * dock.width)
+                            .coerceAtLeast(70.dp)
 
-                Column(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                (workspaceWidth.toPx() * dock.x).roundToInt(),
-                                (workspaceHeight.toPx() * dock.y).roundToInt()
-                            )
-                        }
-                        .width(panelWidth)
-                        .height(panelHeight)
-                        .zIndex(index.toFloat())
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Panel)
-                ) {
-                    Row(
+                    val panelHeight =
+                        (workspaceHeight * dock.height)
+                            .coerceAtLeast(70.dp)
+
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(34.dp)
-                            .background(Color(0xFF252C36))
-                            .pointerInput(
-                                dock,
-                                workspaceWidth,
-                                workspaceHeight
-                            ) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-
-                                    val dx =
-                                        dragAmount.x / workspaceWidth.toPx()
-
-                                    val dy =
-                                        dragAmount.y / workspaceHeight.toPx()
-
-                                    dock.x = (dock.x + dx)
-                                        .coerceIn(0f, 1f - dock.width)
-
-                                    dock.y = (dock.y + dy)
-                                        .coerceIn(0f, 1f - dock.height)
-                                }
-                            },
-                        verticalAlignment = Alignment.CenterVertically
+                            .offset {
+                                IntOffset(
+                                    (workspaceWidth.toPx() * dock.x)
+                                        .roundToInt(),
+                                    (workspaceHeight.toPx() * dock.y)
+                                        .roundToInt()
+                                )
+                            }
+                            .width(panelWidth)
+                            .height(panelHeight)
+                            .zIndex(index.toFloat())
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Panel)
                     ) {
-                        Text(
-                            "☰",
-                            color = Accent,
-                            fontSize = 17.sp,
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        )
-
-                        Text(
-                            dock.title,
-                            color = Accent,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(Modifier.weight(1f))
-
-                        Text(
-                            "DRAG",
-                            color = Muted,
-                            fontSize = 8.sp,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .background(
-                                if (dock.type == "preview")
-                                    Color(0xFF080A0D)
-                                else Panel
-                            )
-                    ) {
-                        DockContent(dock.type)
-
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .size(30.dp)
-                                .align(Alignment.BottomEnd)
+                                .fillMaxWidth()
+                                .height(34.dp)
+                                .background(Color(0xFF252C36))
                                 .pointerInput(
                                     dock,
                                     workspaceWidth,
                                     workspaceHeight
                                 ) {
-                                    detectDragGestures { change, dragAmount ->
+                                    detectDragGestures {
+                                        change, dragAmount ->
+
                                         change.consume()
 
-                                        val dw =
-                                            dragAmount.x / workspaceWidth.toPx()
+                                        val dx =
+                                            dragAmount.x /
+                                                workspaceWidth.toPx()
 
-                                        val dh =
-                                            dragAmount.y / workspaceHeight.toPx()
+                                        val dy =
+                                            dragAmount.y /
+                                                workspaceHeight.toPx()
 
-                                        dock.width = (dock.width + dw)
+                                        dock.x = (dock.x + dx)
                                             .coerceIn(
-                                                0.15f,
-                                                1f - dock.x
+                                                0f,
+                                                1f - dock.width
                                             )
 
-                                        dock.height = (dock.height + dh)
+                                        dock.y = (dock.y + dy)
                                             .coerceIn(
-                                                0.15f,
-                                                1f - dock.y
+                                                0f,
+                                                1f - dock.height
                                             )
                                     }
                                 },
-                            contentAlignment = Alignment.Center
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "◢",
+                                "☰",
                                 color = Accent,
-                                fontSize = 18.sp
+                                fontSize = 17.sp,
+                                modifier = Modifier.padding(horizontal = 8.dp)
                             )
+
+                            Text(
+                                dock.title,
+                                color = Accent,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Spacer(Modifier.weight(1f))
+
+                            Text(
+                                "DRAG",
+                                color = Muted,
+                                fontSize = 8.sp,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .background(
+                                    if (dock.type == "preview")
+                                        Color(0xFF080A0D)
+                                    else Panel
+                                )
+                        ) {
+                            DockContent(dock.type)
+
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .align(Alignment.BottomEnd)
+                                    .pointerInput(
+                                        dock,
+                                        workspaceWidth,
+                                        workspaceHeight
+                                    ) {
+                                        detectDragGestures {
+                                            change, dragAmount ->
+
+                                            change.consume()
+
+                                            val dw =
+                                                dragAmount.x /
+                                                    workspaceWidth.toPx()
+
+                                            val dh =
+                                                dragAmount.y /
+                                                    workspaceHeight.toPx()
+
+                                            dock.width = (dock.width + dw)
+                                                .coerceIn(
+                                                    0.15f,
+                                                    1f - dock.x
+                                                )
+
+                                            dock.height = (dock.height + dh)
+                                                .coerceIn(
+                                                    0.15f,
+                                                    1f - dock.y
+                                                )
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "◢",
+                                    color = Accent,
+                                    fontSize = 18.sp
+                                )
+                            }
                         }
                     }
                 }
