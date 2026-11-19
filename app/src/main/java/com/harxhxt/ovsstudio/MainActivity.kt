@@ -1,9 +1,18 @@
 package com.harxhxt.ovsstudio
 
+import android.Manifest
+import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
-import android.content.SharedPreferences
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -77,7 +86,7 @@ fun defaultDocks(): MutableList<Dock> {
 }
 
 fun loadDocks(
-    preferences: SharedPreferences
+    preferences: android.content.SharedPreferences
 ): MutableList<Dock> {
     val defaults = defaultDocks()
 
@@ -118,7 +127,6 @@ fun OvsWorkspace() {
         "${it.type}:${it.x}:${it.y}:${it.width}:${it.height}:${it.visible}"
     }
 
-    // Automatically save workspace changes
     LaunchedEffect(layoutSignature) {
         delay(300)
 
@@ -127,7 +135,6 @@ fun OvsWorkspace() {
 
             docks.forEach { dock ->
                 val key = dock.type
-
                 putFloat("${key}_x", dock.x)
                 putFloat("${key}_y", dock.y)
                 putFloat("${key}_width", dock.width)
@@ -139,7 +146,6 @@ fun OvsWorkspace() {
         }
     }
 
-    // Restore default workspace
     fun resetWorkspace() {
         val defaults = defaultDocks()
 
@@ -175,9 +181,7 @@ fun OvsWorkspace() {
 
             Box {
                 TextButton(
-                    onClick = {
-                        docksMenuExpanded = true
-                    }
+                    onClick = { docksMenuExpanded = true }
                 ) {
                     Text(
                         "DOCKS ▾",
@@ -196,18 +200,13 @@ fun OvsWorkspace() {
                         DropdownMenuItem(
                             text = {
                                 Row(
-                                    verticalAlignment =
-                                        Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Checkbox(
                                         checked = dock.visible,
                                         onCheckedChange = null
                                     )
-
-                                    Text(
-                                        dock.title,
-                                        fontSize = 12.sp
-                                    )
+                                    Text(dock.title, fontSize = 12.sp)
                                 }
                             },
                             onClick = {
@@ -220,11 +219,7 @@ fun OvsWorkspace() {
 
             Spacer(Modifier.weight(1f))
 
-            TextButton(
-                onClick = {
-                    resetWorkspace()
-                }
-            ) {
+            TextButton(onClick = { resetWorkspace() }) {
                 Text(
                     "RESET LAYOUT",
                     color = Accent,
@@ -249,21 +244,17 @@ fun OvsWorkspace() {
                 if (dock.visible) {
 
                     val panelWidth =
-                        (workspaceWidth * dock.width)
-                            .coerceAtLeast(70.dp)
+                        (workspaceWidth * dock.width).coerceAtLeast(70.dp)
 
                     val panelHeight =
-                        (workspaceHeight * dock.height)
-                            .coerceAtLeast(70.dp)
+                        (workspaceHeight * dock.height).coerceAtLeast(70.dp)
 
                     Column(
                         modifier = Modifier
                             .offset {
                                 IntOffset(
-                                    (workspaceWidth.toPx() * dock.x)
-                                        .roundToInt(),
-                                    (workspaceHeight.toPx() * dock.y)
-                                        .roundToInt()
+                                    (workspaceWidth.toPx() * dock.x).roundToInt(),
+                                    (workspaceHeight.toPx() * dock.y).roundToInt()
                                 )
                             }
                             .width(panelWidth)
@@ -282,30 +273,23 @@ fun OvsWorkspace() {
                                     workspaceWidth,
                                     workspaceHeight
                                 ) {
-                                    detectDragGestures {
-                                        change, dragAmount ->
-
+                                    detectDragGestures { change, dragAmount ->
                                         change.consume()
 
                                         val dx =
-                                            dragAmount.x /
-                                                workspaceWidth.toPx()
-
+                                            dragAmount.x / workspaceWidth.toPx()
                                         val dy =
-                                            dragAmount.y /
-                                                workspaceHeight.toPx()
+                                            dragAmount.y / workspaceHeight.toPx()
 
-                                        dock.x = (dock.x + dx)
-                                            .coerceIn(
-                                                0f,
-                                                1f - dock.width
-                                            )
+                                        dock.x = (dock.x + dx).coerceIn(
+                                            0f,
+                                            1f - dock.width
+                                        )
 
-                                        dock.y = (dock.y + dy)
-                                            .coerceIn(
-                                                0f,
-                                                1f - dock.height
-                                            )
+                                        dock.y = (dock.y + dy).coerceIn(
+                                            0f,
+                                            1f - dock.height
+                                        )
                                     }
                                 },
                             verticalAlignment = Alignment.CenterVertically
@@ -355,30 +339,23 @@ fun OvsWorkspace() {
                                         workspaceWidth,
                                         workspaceHeight
                                     ) {
-                                        detectDragGestures {
-                                            change, dragAmount ->
-
+                                        detectDragGestures { change, dragAmount ->
                                             change.consume()
 
                                             val dw =
-                                                dragAmount.x /
-                                                    workspaceWidth.toPx()
-
+                                                dragAmount.x / workspaceWidth.toPx()
                                             val dh =
-                                                dragAmount.y /
-                                                    workspaceHeight.toPx()
+                                                dragAmount.y / workspaceHeight.toPx()
 
-                                            dock.width = (dock.width + dw)
-                                                .coerceIn(
-                                                    0.15f,
-                                                    1f - dock.x
-                                                )
+                                            dock.width = (dock.width + dw).coerceIn(
+                                                0.15f,
+                                                1f - dock.x
+                                            )
 
-                                            dock.height = (dock.height + dh)
-                                                .coerceIn(
-                                                    0.15f,
-                                                    1f - dock.y
-                                                )
+                                            dock.height = (dock.height + dh).coerceIn(
+                                                0.15f,
+                                                1f - dock.y
+                                            )
                                         }
                                     },
                                 contentAlignment = Alignment.Center
@@ -394,6 +371,8 @@ fun OvsWorkspace() {
                 }
             }
         }
+
+        RecordingControls()
 
         Row(
             modifier = Modifier
@@ -425,7 +404,6 @@ fun DockContent(type: String) {
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )
-
                 Text(
                     "Preview Area",
                     color = Muted,
@@ -482,5 +460,218 @@ fun RowScope.WorkspaceButton(label: String) {
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+}
+
+@Composable
+fun RecordingControls() {
+    val context = LocalContext.current
+
+    var status by remember {
+        mutableStateOf("IDLE")
+    }
+
+    var seconds by remember {
+        mutableLongStateOf(0L)
+    }
+
+    var message by remember {
+        mutableStateOf("Ready to record")
+    }
+
+    val captureLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+
+            if (
+                result.resultCode == Activity.RESULT_OK &&
+                result.data != null
+            ) {
+                RecordingManager.startRecording(
+                    context,
+                    result.resultCode,
+                    result.data!!
+                )
+            } else {
+                message = "Screen capture permission denied"
+            }
+        }
+
+    fun requestScreenCapture() {
+        captureLauncher.launch(
+            RecordingManager.createScreenCaptureIntent(context)
+        )
+    }
+
+    val microphoneLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+
+            if (granted) {
+                requestScreenCapture()
+            } else {
+                message = "Microphone permission required"
+            }
+        }
+
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context?,
+                intent: Intent?
+            ) {
+                if (
+                    intent?.action ==
+                    RecordingManager.ACTION_STATUS
+                ) {
+                    status = intent.getStringExtra(
+                        RecordingManager.EXTRA_STATUS
+                    ) ?: "IDLE"
+
+                    seconds = intent.getLongExtra(
+                        RecordingManager.EXTRA_SECONDS,
+                        0L
+                    )
+
+                    message = intent.getStringExtra(
+                        RecordingManager.EXTRA_MESSAGE
+                    ) ?: ""
+                }
+            }
+        }
+
+        val filter = IntentFilter(
+            RecordingManager.ACTION_STATUS
+        )
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(
+                receiver,
+                filter,
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(receiver, filter)
+        }
+
+        onDispose {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    val timeText = String.format(
+        "%02d:%02d:%02d",
+        seconds / 3600,
+        (seconds % 3600) / 60,
+        seconds % 60
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel)
+            .padding(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "REC",
+                color = Color.Red,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                timeText,
+                color = Color.White,
+                fontSize = 16.sp
+            )
+
+            Text(
+                status,
+                color = Accent,
+                fontSize = 11.sp
+            )
+
+            Spacer(Modifier.weight(1f))
+
+            when (status) {
+                "IDLE", "STOPPED", "ERROR" -> {
+                    Button(
+                        onClick = {
+                            if (
+                                context.checkSelfPermission(
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                requestScreenCapture()
+                            } else {
+                                microphoneLauncher.launch(
+                                    Manifest.permission.RECORD_AUDIO
+                                )
+                            }
+                        }
+                    ) {
+                        Text("START")
+                    }
+                }
+
+                "RECORDING" -> {
+                    Button(
+                        onClick = {
+                            RecordingManager.pause(context)
+                        }
+                    ) {
+                        Text("PAUSE")
+                    }
+
+                    Button(
+                        onClick = {
+                            RecordingManager.stop(context)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFB3261E)
+                        )
+                    ) {
+                        Text("STOP")
+                    }
+                }
+
+                "PAUSED" -> {
+                    Button(
+                        onClick = {
+                            RecordingManager.resume(context)
+                        }
+                    ) {
+                        Text("RESUME")
+                    }
+
+                    Button(
+                        onClick = {
+                            RecordingManager.stop(context)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFB3261E)
+                        )
+                    ) {
+                        Text("STOP")
+                    }
+                }
+            }
+        }
+
+        Text(
+            message,
+            color = Muted,
+            fontSize = 10.sp
+        )
     }
 }
