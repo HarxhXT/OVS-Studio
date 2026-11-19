@@ -4,7 +4,6 @@ import android.app.*
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.MediaRecorder
@@ -14,6 +13,7 @@ import android.net.Uri
 import android.os.*
 import android.provider.MediaStore
 import android.util.DisplayMetrics
+import android.view.WindowManager
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -142,8 +142,12 @@ class RecordingService : Service() {
             )
 
             val metrics = DisplayMetrics()
+
+            val displayManager =
+                getSystemService(WINDOW_SERVICE) as WindowManager
+
             @Suppress("DEPRECATION")
-            windowManager.defaultDisplay.getRealMetrics(metrics)
+            displayManager.defaultDisplay.getRealMetrics(metrics)
 
             val width = metrics.widthPixels and -2
             val height = metrics.heightPixels and -2
@@ -218,7 +222,7 @@ class RecordingService : Service() {
                 "ERROR",
                 e.message ?: "Recording could not start"
             )
-            cleanup(false)
+            cleanup(true)
             stopSelf()
         }
     }
