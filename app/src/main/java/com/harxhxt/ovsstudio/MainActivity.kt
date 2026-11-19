@@ -14,17 +14,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 private val Background = Color(0xFF101318)
 private val Panel = Color(0xFF1B2028)
 private val Accent = Color(0xFF80CBC4)
 private val Muted = Color(0xFF929BA8)
+
+private const val PREFS_NAME = "ovs_workspace"
+private const val LAYOUT_VERSION = 1
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,16 +63,75 @@ class Dock(
     var height by mutableFloatStateOf(height)
 }
 
+fun defaultDocks(): MutableList<Dock> {
+    return mutableListOf(
+        Dock("SCENES", "scenes", 0f, 0f, 0.18f, 1f),
+        Dock("PREVIEW", "preview", 0.19f, 0f, 0.55f, 0.68f),
+        Dock("SOURCES", "sources", 0.19f, 0.70f, 0.55f, 0.28f),
+        Dock("AUDIO MIXER", "audio", 0.75f, 0f, 0.24f, 0.68f),
+        Dock("SCENE TRANSITIONS", "transitions", 0.75f, 0.70f, 0.24f, 0.28f)
+    )
+}
+
+fun loadDocks(
+    preferences: android.content.SharedPreferences
+): MutableList<Dock> {
+    val defaults = defaultDocks()
+
+    if (preferences.getInt("layout_version", 0) != LAYOUT_VERSION) {
+        return defaults
+    }
+
+    return defaults.map { dock ->
+        val key = dock.type
+
+        Dock(
+            dock.title,
+            dock.type,
+            preferences.getFloat("${key}_x", dock.x),
+            preferences.getFloat("${key}_y", dock.y),
+            preferences.getFloat("${key}_width", dock.width),
+            preferences.getFloat("${key}_height", dock.height)
+        )
+    }.toMutableList()
+}
+
 @Composable
 fun OvsWorkspace() {
-    val docks = remember {
-        mutableStateListOf(
-            Dock("SCENES", "scenes", 0f, 0f, 0.18f, 1f),
-            Dock("PREVIEW", "preview", 0.19f, 0f, 0.55f, 0.68f),
-            Dock("SOURCES", "sources", 0.19f, 0.70f, 0.55f, 0.28f),
-            Dock("AUDIO MIXER", "audio", 0.75f, 0f, 0.24f, 0.68f),
-            Dock("SCENE TRANSITIONS", "transitions", 0.75f, 0.70f, 0.24f, 0.28f)
-        )
+    val context = LocalContext.current
+
+    val preferences = remember(context) {
+        context.getSharedPreferences(PREFS_NAME, 0)
+    }
+
+    val docks = remember(preferences) {
+        mutableStateListOf<Dock>().apply {
+            addAll(loadDocks(preferences))
+        }
+    }
+
+    val layoutSignature = docks.joinToString("|") {
+        "${it.type}:${it.x}:${it.y}:${it.width}:${it.height}"
+    }
+
+    // Automatic workspace saving
+    LaunchedEffect(layoutSignature) {
+        delay(300)
+
+        preferences.edit().apply {
+            putInt("layout_version", LAYOUT_VERSION)
+
+            docks.forEach { dock ->
+                val key = dock.type
+
+                putFloat("${key}_x", dock.x)
+                putFloat("${key}_y", dock.y)
+                putFloat("${key}_width", dock.width)
+                putFloat("${key}_height", dock.height)
+            }
+
+            apply()
+        }
     }
 
     Column(
@@ -144,12 +208,19 @@ fun OvsWorkspace() {
                             .fillMaxWidth()
                             .height(34.dp)
                             .background(Color(0xFF252C36))
-                            .pointerInput(dock, workspaceWidth, workspaceHeight) {
+                            .pointerInput(
+                                dock,
+                                workspaceWidth,
+                                workspaceHeight
+                            ) {
                                 detectDragGestures { change, dragAmount ->
                                     change.consume()
 
-                                    val dx = dragAmount.x / workspaceWidth.toPx()
-                                    val dy = dragAmount.y / workspaceHeight.toPx()
+                                    val dx =
+                                        dragAmount.x / workspaceWidth.toPx()
+
+                                    val dy =
+                                        dragAmount.y / workspaceHeight.toPx()
 
                                     dock.x = (dock.x + dx)
                                         .coerceIn(0f, 1f - dock.width)
